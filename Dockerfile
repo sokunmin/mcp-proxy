@@ -25,9 +25,28 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Final stage with explicit platform specification
 FROM python:3.12-alpine
 
+# Install Node.js and npm for npx support, plus wget for health checks
+RUN apk add --no-cache nodejs npm wget
+
+# Install uv for uvx support
+RUN python3 -m ensurepip && pip install --no-cache-dir uv
+
+# Create app user
+RUN addgroup -g 1000 app && adduser -u 1000 -G app -s /bin/sh -D app
+
 COPY --from=uv --chown=app:app /app/.venv /app/.venv
 
+# Copy servers.json configuration
+COPY --chown=app:app servers.json /app/servers.json
+
 # Place executables in the environment at the front of the path
-ENV PATH="/app/.venv/bin:$PATH"
+ENV PATH="/app/.venv/bin:$PATH" \
+    UV_PYTHON_PREFERENCE=only-system
+
+# Switch to app user
+USER app
+
+# Set working directory
+WORKDIR /app
 
 ENTRYPOINT ["mcp-proxy"]
