@@ -22,6 +22,18 @@ ADD . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-editable
 
+# Install Node.js and npm for npx package installation during build
+RUN apk add --no-cache nodejs npm
+
+# Copy the MCP package installation script and servers.json
+COPY install_mcp_packages.py servers.json ./
+
+# Pre-install MCP packages based on servers.json configuration
+# This makes uvx and npx packages available without runtime downloads
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=cache,target=/root/.npm \
+    python3 install_mcp_packages.py servers.json
+
 # Final stage with explicit platform specification
 FROM python:3.12-alpine
 
@@ -34,13 +46,22 @@ RUN python3 -m ensurepip && pip install --no-cache-dir uv
 # Create app user
 RUN addgroup -g 1000 app && adduser -u 1000 -G app -s /bin/sh -D app
 
+# Copy the virtual environment and pre-installed packages from build stage
 COPY --from=uv --chown=app:app /app/.venv /app/.venv
+
+# Copy uv tools (pre-installed uvx packages) from build stage
+COPY --from=uv --chown=app:app /root/.local /home/app/.local
+
+# Copy global npm packages from build stage
+COPY --from=uv --chown=app:app /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=uv --chown=app:app /usr/local/bin /usr/local/bin
 
 # Copy servers.json configuration
 COPY --chown=app:app servers.json /app/servers.json
 
 # Place executables in the environment at the front of the path
-ENV PATH="/app/.venv/bin:$PATH" \
+# Include uv tools path for pre-installed uvx packages
+ENV PATH="/app/.venv/bin:/home/app/.local/bin:$PATH" \
     UV_PYTHON_PREFERENCE=only-system
 
 # Switch to app user
