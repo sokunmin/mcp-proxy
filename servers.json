@@ -1,8 +1,6 @@
 {
   "mcpServers": {
     "fetch": {
-      "disabled": false,
-      "timeout": 60,
       "command": "uvx",
       "args": [
         "mcp-server-fetch"
@@ -12,6 +10,22 @@
     "time": {
       "command": "uvx",
       "args": ["mcp-server-time"]
+    },
+	"sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "github": {
+      "timeout": 60,
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "transportType": "stdio"
     }
   }
 }

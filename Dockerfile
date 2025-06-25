@@ -34,6 +34,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=cache,target=/root/.npm \
     python3 install_mcp_packages.py servers.json
 
+# Ensure npm directories exist even if no packages were installed
+RUN mkdir -p /usr/local/lib/node_modules /usr/local/bin
+
 # Final stage with explicit platform specification
 FROM python:3.12-alpine
 
