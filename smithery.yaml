@@ -1,12 +1,15 @@
-# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
-
+# smithery.yaml
+runtime: container
+build:
+  dockerfile: Dockerfile # Assuming your Dockerfile is named Dockerfile in the root
+  dockerBuildPath: .     # Build context is the current directory
 startCommand:
-  type: stdio
+  type: http # This tells Smithery to expect an HTTP server
   configSchema:
     # JSON Schema defining the configuration options for the MCP.
     type: object
     required:
-      - commandOrUrl
+      - commandOrUrl # This is still required by Smithery's schema, but we'll ignore it in commandFunction
     properties:
       commandOrUrl:
         type: string
@@ -27,4 +30,11 @@ startCommand:
   commandFunction:
     # A function that produces the CLI command to start the MCP on stdio.
     |-
-    (config) => { let command = ['mcp-proxy', config.commandOrUrl]; if (config.ssePort) command.push('--sse-port=' + config.ssePort); if (config.sseHost) command.push('--sse-host=' + config.sseHost); return { command: 'mcp-proxy', args: command, env: config.apiAccessToken ? { API_ACCESS_TOKEN: config.apiAccessToken, ...config.env } : config.env }; }
+    (config) => {
+      let command = ['mcp-proxy', '--port=' + process.env.PORT, '--host=0.0.0.0', '--named-server-config', '/app/servers.json'];
+      if (config.apiAccessToken) {
+        command.push('--headers', 'Authorization', 'Bearer ' + config.apiAccessToken);
+      }
+      // Add other config parameters if needed, but for named-server-config, they might be redundant
+      return { command: command[0], args: command.slice(1), env: config.env };
+    }
