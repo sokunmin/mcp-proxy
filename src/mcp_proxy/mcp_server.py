@@ -158,7 +158,8 @@ class LazyServerProvider:
 async def run_mcp_server(
     mcp_settings: MCPServerSettings,
     default_server_params: StdioServerParameters | None = None,
-    named_server_params: dict[str, StdioServerParameters] | None = None,
+    named_server_params: dict[str, StdioServe
+    rParameters] | None = None,
 ) -> None:
     """Run stdio client(s) and expose an MCP server with multiple possible backends."""
     if named_server_params is None:
@@ -198,26 +199,36 @@ async def run_mcp_server(
             mcp_settings.stateless,
         )
 
-        for name in named_server_params:
+        if named_server_params:
 
             async def app_factory(scope: Scope, receive: Receive, send: Send) -> None:
-                server_name = scope["path"].split("/")[2]
-                app = await lazy_server_provider.get_app(server_name)
-                if app:
-                    # Adjust the scope to be relative to the mounted app
-                    original_path = scope["path"]
-                    scope["path"] = original_path.split(f"/servers/{server_name}", 1)[-1]
-                    await app(scope, receive, send)
-                    scope["path"] = original_path  # Restore for safety
+                path_parts = scope["path"].split("/")
+                if len(path_parts) > 2:
+                    server_name = path_parts[2]
+                    app = await lazy_server_provider.get_app(server_name)
+                    if app:
+                        # Adjust the scope to be relative to the mounted app
+                        original_path = scope["path"]
+                        scope["path"] = original_path.split(f"/servers/{server_name}", 1)[-1]
+                        await app(scope, receive, send)
+                        scope["path"] = original_path  # Restore for safety
+                    else:
+                        response = JSONResponse(
+                            {"error": f"Server '{server_name}' not available or failed to start."},
+                            status_code=503,
+                        )
+                        await response(scope, receive, send)
                 else:
+                    # Handle case where /servers/ is accessed without a server name
                     response = JSONResponse(
-                        {"error": f"Server '{server_name}' not available or failed to start."},
-                        status_code=503,
+                        {"error": "Please specify a server name, e.g., /servers/my-server"},
+                        status_code=404,
                     )
                     await response(scope, receive, send)
 
-            all_routes.append(Mount(f"/servers/{name}", app=app_factory))
-            _global_status["server_instances"][name] = "available"
+            all_routes.append(Mount("/servers", app=app_factory))
+            for name in named_server_params:
+                _global_status["server_instances"][name] = "available"
 
         if not default_server_params and not named_server_params:
             logger.error("No servers configured to run.")

@@ -11,7 +11,8 @@ ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
 # Install the project's dependencies using the lockfile and settings
-RUN --mount=type=cache,target=/root/.cache/uv \
+RUN echo "----> Installing Python dependencies..." && \
+    --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --frozen --no-install-project --no-dev --no-editable
@@ -19,35 +20,42 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Then, add the rest of the project source code and install it
 # Installing separately from its dependencies allows optimal layer caching
 ADD . /app
-RUN --mount=type=cache,target=/root/.cache/uv \
+RUN echo "----> Installing project..." && \
+    --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-editable
 
 # Install Node.js and npm for npx package installation during build
-RUN apk add --no-cache nodejs npm
+RUN echo "----> Installing Node.js and npm..." && \
+    apk add --no-cache nodejs npm
 
 # Copy the MCP package installation script and servers.json
 COPY install_mcp_packages.py servers.json ./
 
 # Pre-install MCP packages based on servers.json configuration
 # This makes uvx and npx packages available without runtime downloads
-RUN --mount=type=cache,target=/root/.cache/uv \
+RUN echo "----> Pre-installing MCP packages..." && \
+    --mount=type=cache,target=/root/.cache/uv \
     --mount=type=cache,target=/root/.npm \
     python3 install_mcp_packages.py servers.json
 
 # Ensure npm directories exist even if no packages were installed
-RUN mkdir -p /usr/local/lib/node_modules /usr/local/bin
+RUN echo "----> Creating npm directories..." && \
+    mkdir -p /usr/local/lib/node_modules /usr/local/bin
 
 # Final stage with explicit platform specification
 FROM python:3.12-alpine
 
 # Install Node.js and npm for npx support, plus wget for health checks
-RUN apk add --no-cache nodejs npm wget
+RUN echo "----> Installing Node.js, npm, and wget in final stage..." && \
+    apk add --no-cache nodejs npm wget
 
 # Install uv for uvx support
-RUN python3 -m ensurepip && pip install --no-cache-dir uv
+RUN echo "----> Installing uv in final stage..." && \
+    python3 -m ensurepip && pip install --no-cache-dir uv
 
 # Create app user
-RUN addgroup -g 1000 app && adduser -u 1000 -G app -s /bin/sh -D app
+RUN echo "----> Creating app user..." && \
+    addgroup -g 1000 app && adduser -u 1000 -G app -s /bin/sh -D app
 
 # Copy the virtual environment and pre-installed packages from build stage
 COPY --from=uv --chown=app:app /app/.venv /app/.venv
