@@ -243,6 +243,8 @@ async def run_mcp_server(
             lifespan=combined_lifespan,
         )
 
+        logger.info("Starlette app created. Starting Uvicorn server...")
+
         config = uvicorn.Config(
             starlette_app,
             host=mcp_settings.bind_host,
@@ -250,6 +252,8 @@ async def run_mcp_server(
             log_level=mcp_settings.log_level.lower(),
         )
         http_server = uvicorn.Server(config)
+
+        logger.info("Uvicorn server configured. Starting to serve...")
 
         base_url = f"http://{mcp_settings.bind_host}:{mcp_settings.port}"
         sse_urls = [f"{base_url}/sse"] if default_server_params else []
