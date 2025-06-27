@@ -1,5 +1,6 @@
 """Create a local SSE server that proxies requests to a stdio MCP server."""
 
+import asyncio
 import contextlib
 import logging
 from collections.abc import AsyncIterator
@@ -97,6 +98,63 @@ def create_single_instance_routes(
     return routes, http_session_manager
 
 
+class LazyServerProvider:
+    """Manages the on-demand startup of named MCP server instances."""
+
+    def __init__(
+        self,
+        server_params: dict[str, StdioServerParameters],
+        exit_stack: contextlib.AsyncExitStack,
+        stateless: bool,
+    ) -> None:
+        self._server_params = server_params
+        self._exit_stack = exit_stack
+        self._stateless = stateless
+        self._proxies: dict[str, MCPServerSDK[object]] = {}
+        self._apps: dict[str, Starlette] = {}
+        self._locks: dict[str, asyncio.Lock] = {name: asyncio.Lock() for name in server_params}
+
+    async def get_app(self, name: str) -> Starlette | None:
+        """Get a Starlette application for a named server, creating it on first request."""
+        if name not in self._server_params:
+            return None
+
+        if name in self._apps:
+            return self._apps[name]
+
+        async with self._locks[name]:
+            if name in self._apps:
+                return self._apps[name]
+
+            params = self._server_params[name]
+            logger.info(
+                "Lazily starting named server '%s': %s %s",
+                name,
+                params.command,
+                " ".join(params.args),
+            )
+            try:
+                stdio_streams = await self._exit_stack.enter_async_context(stdio_client(params))
+                session = await self._exit_stack.enter_async_context(ClientSession(*stdio_streams))
+                proxy = await create_proxy_server(session)
+                self._proxies[name] = proxy
+
+                instance_routes, http_manager = create_single_instance_routes(
+                    proxy,
+                    stateless_instance=self._stateless,
+                )
+                await self._exit_stack.enter_async_context(http_manager.run())
+
+                app = Starlette(routes=instance_routes)
+                self._apps[name] = app
+                _global_status["server_instances"][name] = "running"
+                return app
+            except Exception:
+                logger.exception("Failed to lazily start server '%s'", name)
+                _global_status["server_instances"][name] = "failed"
+                return None
+
+
 async def run_mcp_server(
     mcp_settings: MCPServerSettings,
     default_server_params: StdioServerParameters | None = None,
@@ -107,19 +165,17 @@ async def run_mcp_server(
         named_server_params = {}
 
     all_routes: list[BaseRoute] = [
-        Route("/status", endpoint=_handle_status),  # Global status endpoint
+        Route("/status", endpoint=_handle_status),
     ]
-    # Use AsyncExitStack to manage lifecycles of multiple components
+
     async with contextlib.AsyncExitStack() as stack:
-        # Manage lifespans of all StreamableHTTPSessionManagers
+
         @contextlib.asynccontextmanager
         async def combined_lifespan(_app: Starlette) -> AsyncIterator[None]:
             logger.info("Main application lifespan starting...")
-            # All http_session_managers' .run() are already entered into the stack
             yield
             logger.info("Main application lifespan shutting down...")
 
-        # Setup default server if configured
         if default_server_params:
             logger.info(
                 "Setting up default server: %s %s",
@@ -129,54 +185,56 @@ async def run_mcp_server(
             stdio_streams = await stack.enter_async_context(stdio_client(default_server_params))
             session = await stack.enter_async_context(ClientSession(*stdio_streams))
             proxy = await create_proxy_server(session)
-
             instance_routes, http_manager = create_single_instance_routes(
-                proxy,
-                stateless_instance=mcp_settings.stateless,
+                proxy, stateless_instance=mcp_settings.stateless
             )
-            await stack.enter_async_context(http_manager.run())  # Manage lifespan by calling run()
+            await stack.enter_async_context(http_manager.run())
             all_routes.extend(instance_routes)
-            _global_status["server_instances"]["default"] = "configured"
+            _global_status["server_instances"]["default"] = "running"
 
-        # Setup named servers
-        for name, params in named_server_params.items():
-            logger.info(
-                "Setting up named server '%s': %s %s",
-                name,
-                params.command,
-                " ".join(params.args),
-            )
-            stdio_streams_named = await stack.enter_async_context(stdio_client(params))
-            session_named = await stack.enter_async_context(ClientSession(*stdio_streams_named))
-            proxy_named = await create_proxy_server(session_named)
+        lazy_server_provider = LazyServerProvider(
+            named_server_params,
+            stack,
+            mcp_settings.stateless,
+        )
 
-            instance_routes_named, http_manager_named = create_single_instance_routes(
-                proxy_named,
-                stateless_instance=mcp_settings.stateless,
-            )
-            await stack.enter_async_context(
-                http_manager_named.run(),
-            )  # Manage lifespan by calling run()
+        for name in named_server_params:
 
-            # Mount these routes under /servers/<name>/
-            server_mount = Mount(f"/servers/{name}", routes=instance_routes_named)
-            all_routes.append(server_mount)
-            _global_status["server_instances"][name] = "configured"
+            async def app_factory(scope: Scope, receive: Receive, send: Send) -> None:
+                server_name = scope["path"].split("/")[2]
+                app = await lazy_server_provider.get_app(server_name)
+                if app:
+                    # Adjust the scope to be relative to the mounted app
+                    original_path = scope["path"]
+                    scope["path"] = original_path.split(f"/servers/{server_name}", 1)[-1]
+                    await app(scope, receive, send)
+                    scope["path"] = original_path  # Restore for safety
+                else:
+                    response = JSONResponse(
+                        {"error": f"Server '{server_name}' not available or failed to start."},
+                        status_code=503,
+                    )
+                    await response(scope, receive, send)
+
+            all_routes.append(Mount(f"/servers/{name}", app=app_factory))
+            _global_status["server_instances"][name] = "available"
 
         if not default_server_params and not named_server_params:
             logger.error("No servers configured to run.")
             return
 
-        middleware: list[Middleware] = []
-        if mcp_settings.allow_origins:
-            middleware.append(
+        middleware = (
+            [
                 Middleware(
                     CORSMiddleware,
                     allow_origins=mcp_settings.allow_origins,
                     allow_methods=["*"],
                     allow_headers=["*"],
-                ),
-            )
+                )
+            ]
+            if mcp_settings.allow_origins
+            else []
+        )
 
         starlette_app = Starlette(
             debug=(mcp_settings.log_level == "DEBUG"),
@@ -193,20 +251,11 @@ async def run_mcp_server(
         )
         http_server = uvicorn.Server(config)
 
-        # Print out the SSE URLs for all configured servers
         base_url = f"http://{mcp_settings.bind_host}:{mcp_settings.port}"
-        sse_urls = []
-
-        # Add default server if configured
-        if default_server_params:
-            sse_urls.append(f"{base_url}/sse")
-
-        # Add named servers
+        sse_urls = [f"{base_url}/sse"] if default_server_params else []
         sse_urls.extend([f"{base_url}/servers/{name}/sse" for name in named_server_params])
 
-        # Display the SSE URLs prominently
         if sse_urls:
-            # Using print directly for user visibility, with noqa to ignore linter warnings
             logger.info("Serving MCP Servers via SSE:")
             for url in sse_urls:
                 logger.info("  - %s", url)
