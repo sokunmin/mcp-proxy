@@ -158,8 +158,7 @@ class LazyServerProvider:
 async def run_mcp_server(
     mcp_settings: MCPServerSettings,
     default_server_params: StdioServerParameters | None = None,
-    named_server_params: dict[str, StdioServe
-    rParameters] | None = None,
+    named_server_params: dict[str, StdioServerParameters] | None = None,
 ) -> None:
     """Run stdio client(s) and expose an MCP server with multiple possible backends."""
     if named_server_params is None:
