@@ -1,6 +1,3 @@
-# Ignore the prompt directory
-prompt/
-
 # Ignore the .idea directory
 .idea/
 
