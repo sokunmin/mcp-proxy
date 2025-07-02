@@ -2,42 +2,43 @@
 
 This project provides a simple and flexible proxy server built with **FastMCP**. It is designed to expose one or more underlying MCP (Model Context Protocol) servers over various transport protocols, making them accessible to a wider range of clients.
 
-The server is containerized using Docker for easy and consistent deployment, but can also be run locally with Python.
+The server is containerized using Docker for easy and consistent deployment.
 
 ## Features
 
 - **Multiple Transports**: Expose MCP servers over `stdio`, `sse` (Server-Sent Events), or `http`.
-- **Flexible Configuration**: Easily configure which MCP servers to proxy by editing the `proxy_config` dictionary in `mcp_proxy.py`.
+- **Flexible Configuration**: Easily configure which MCP servers to proxy by editing the `servers.json` file.
 - **Lightweight & Fast**: Built on the efficient FastMCP library and runs in a small Alpine Linux container.
 - **Containerized**: Docker and Docker Compose files are provided for a one-command setup.
 
 ## Requirements
 
-- **Recommended**: Docker and Docker Compose
-- **Alternative**: Python 3.12+ and Node.js (for `npx`)
+- Docker and Docker Compose
 
 ---
 
-## How to Run (Using Docker - Recommended)
+## How to Run
 
-This is the easiest and most consistent way to run the server, as it handles all dependencies for you.
+This project is designed to be run with Docker. This is the easiest and most consistent way to run the server, as it handles all dependencies for you.
 
 1.  **Clone the repository:**
     ```bash
     git clone <repository-url>
-    cd mcp-proxy-dev
+    cd mcp-proxy
     ```
 
 2.  **Build and Run the Server:**
     The default command will start the server in `sse` mode.
     ```bash
-    docker-compose up
+    docker-compose up --build
     ```
-    The server will be accessible at `http://localhost:8000`. Because the project files are mounted as a volume, you can edit the Python code on your local machine, and the server inside the container will update automatically.
+    The `--build` flag is important to ensure any changes to the `Dockerfile` or your source code are applied.
 
-### Running Different Transports with Docker
+    The server will be accessible at `http://localhost:8000`. Because the project files are mounted as a volume, you can edit the `servers.json` file on your local machine, and the changes will be reflected the next time you restart the container.
 
-To run the server with a different transport (`http` or `stdio`), you can override the default command directly with `docker-compose run`.
+### Running Different Transports
+
+To run the server with a different transport (`http` or `stdio`), you can override the default command in the `docker-compose.yml` file or directly with `docker-compose run`.
 
 *   **To run with HTTP transport:**
     ```bash
@@ -53,72 +54,28 @@ To run the server with a different transport (`http` or `stdio`), you can overri
 
 ---
 
-## How to Run (Locally with Python)
-
-If you prefer not to use Docker, you can run the server directly.
-
-1.  **Install Dependencies:**
-    Make sure you have Python 3.12+ and Node.js installed.
-    ```bash
-    # It is highly recommended to use a virtual environment
-    python -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-
-    # Install Python packages
-    pip install -r requirements.txt
-    ```
-
-2.  **Run the Server:**
-    Run the proxy from your terminal by specifying the desired transport protocol.
-
-    *   **For Stdio Transport:**
-        ```bash
-        python mcp_proxy.py stdio
-        ```
-
-    *   **For SSE Transport:**
-        ```bash
-        # Run on the default port (8000)
-        python mcp_proxy.py sse
-
-        # Run on a custom port
-        python mcp_proxy.py sse --port 8080
-        ```
-
-    *   **For HTTP Transport:**
-        ```bash
-        # Run on the default port (8001)
-        python mcp_proxy.py http
-
-        # Run on a custom port
-        python mcp_proxy.py http --port 8081
-        ```
-
----
-
 ## Configuration
 
-To configure the proxy, edit the `proxy_config` dictionary in the `mcp_proxy.py` file. You can add, remove, or modify the MCP servers that you want to expose.
+To configure the proxy, edit the `servers.json` file. You can add, remove, or modify the MCP servers that you want to expose.
 
-```python
-# Define the MCP server(s) we want to proxy
-proxy_config = {
-    "mcpServers": {
-        "context7": {
-            "transport": "stdio",
-            "command": "npx",
-            "args": ["-y", "@upstash/context7-mcp"]
-        },
-        "fetch": {
-            "command": "uvx",
-            "args": ["mcp-server-fetch"]
-        },
-        "time": {
-            "transport": "stdio",
-            "command": "uvx",
-            "args": ["mcp-server-time"]
-        }
+```json
+{
+  "mcpServers": {
+    "context7": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch"]
+    },
+    "time": {
+      "transport": "stdio",
+      "command": "uvx",
+      "args": ["mcp-server-time", "--local-timezone", "Etc/UTC"]
     }
+  }
 }
 ```
 

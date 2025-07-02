@@ -9,7 +9,7 @@ RUN apk add --no-cache nodejs npm
 WORKDIR /app
 
 # Copy requirements and install Python dependencies using the pre-installed uv
-COPY requirements.txt .
+COPY requirements.txt servers.json .
 RUN uv pip install --system --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code
