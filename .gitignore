@@ -1,0 +1,8 @@
+# Ignore the prompt directory
+prompt/
+
+# Ignore the .idea directory
+.idea/
+
+# Ignore the __pycache__ directory
+__pycache__/
