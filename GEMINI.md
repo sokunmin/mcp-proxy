@@ -7,7 +7,9 @@ Developing MCP server using the latest FastMCP version, Python 3.12, and a uv ve
 
 ### Python Environment
 - Python Version: 3.12
-- uv venv path (VIRTUAL_ENV): D:\rovo_workspace\global-mcp-venv
+- uv venv path (VIRTUAL_ENV): 
+  - Windows: D:\rovo_workspace\global-mcp-venv
+  - MacOSX: /Users/chunming/mcp-venv
 - uv is only used for local environment.
 
 

@@ -1,0 +1,69 @@
+# Previously Working Version Logs
+```
+docker-compose down ; docker-compose up --build
+
+[+] Running 2/2
+ ✔ Container mcp-proxy-dev-mcp-proxy-1  Removed                                                                                                                                                                                  0.0s
+ ✔ Network mcp-proxy-dev_default        Removed                                                                                                                                                                                  0.7s
+[+] Building 2.1s (13/13) FINISHED
+ => [internal] load local bake definitions                                                                                                                                                                                       0.0s
+ => => reading from stdin 383B                                                                                                                                                                                                   0.0s
+ => [internal] load build definition from Dockerfile                                                                                                                                                                             0.0s
+ => => transferring dockerfile: 746B                                                                                                                                                                                             0.0s
+ => [internal] load metadata for ghcr.io/astral-sh/uv:python3.12-alpine                                                                                                                                                          1.3s
+ => [internal] load .dockerignore                                                                                                                                                                                                0.0s
+ => => transferring context: 2B                                                                                                                                                                                                  0.0s
+ => [1/6] FROM ghcr.io/astral-sh/uv:python3.12-alpine@sha256:ff3067158bdaa2e49765a33928c727ca0756614377265c5d54e7f8b9ce1dc677                                                                                                    0.0s
+ => [internal] load build context                                                                                                                                                                                                0.0s
+ => => transferring context: 13.75kB                                                                                                                                                                                             0.0s
+ => CACHED [2/6] RUN apk add --no-cache nodejs npm                                                                                                                                                                               0.0s
+ => CACHED [3/6] WORKDIR /app                                                                                                                                                                                                    0.0s
+ => CACHED [4/6] COPY requirements.txt servers.json .                                                                                                                                                                            0.0s
+ => CACHED [5/6] RUN uv pip install --system --no-cache-dir -r requirements.txt                                                                                                                                                  0.0s
+ => [6/6] COPY . .                                                                                                                                                                                                               0.0s
+ => exporting to image                                                                                                                                                                                                           0.0s
+ => => exporting layers                                                                                                                                                                                                          0.0s
+ => => writing image sha256:941a449c56f034ede4f09ccc7820f73ba331c771ff8e2437fa227d0e183552e7                                                                                                                                     0.0s
+ => => naming to docker.io/library/mcp-proxy-dev-mcp-proxy                                                                                                                                                                       0.0s
+ => resolving provenance for metadata file                                                                                                                                                                                       0.0s
+[+] Running 3/3
+ ✔ mcp-proxy                            Built                                                                                                                                                                                    0.0s
+ ✔ Network mcp-proxy-dev_default        Created                                                                                                                                                                                  0.0s
+ ✔ Container mcp-proxy-dev-mcp-proxy-1  Created                                                                                                                                                                                  0.1s
+    Attaching to mcp-proxy-1
+mcp-proxy-1  | [07/03/25 02:05:08] INFO     Starting MCP server 'FastMCP' with   server.py:1378
+mcp-proxy-1  |                              transport 'sse' on
+mcp-proxy-1  |                              http://0.0.0.0:8000/sse/
+mcp-proxy-1  | INFO:     Started server process [1]
+mcp-proxy-1  | INFO:     Waiting for application startup.
+mcp-proxy-1  | INFO:     Application startup complete.
+mcp-proxy-1  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+mcp-proxy-1  | Starting proxy with sse transport...
+mcp-proxy-1  | INFO:     172.22.0.1:57748 - "GET /sse/ HTTP/1.1" 200 OK
+mcp-proxy-1  | INFO:     172.22.0.1:57752 - "POST /messages/?session_id=bcd16392e7674d629b9fc428d18cb506 HTTP/1.1" 202 Accepted
+mcp-proxy-1  | INFO:     172.22.0.1:57752 - "POST /messages/?session_id=bcd16392e7674d629b9fc428d18cb506 HTTP/1.1" 202 Accepted
+mcp-proxy-1  | INFO:     172.22.0.1:57752 - "POST /messages/?session_id=bcd16392e7674d629b9fc428d18cb506 HTTP/1.1" 202 Accepted
+mcp-proxy-1  | INFO:     172.22.0.1:57762 - "POST /messages/?session_id=bcd16392e7674d629b9fc428d18cb506 HTTP/1.1" 202 Accepted
+mcp-proxy-1  | INFO:     172.22.0.1:57752 - "POST /messages/?session_id=bcd16392e7674d629b9fc428d18cb506 HTTP/1.1" 202 Accepted
+mcp-proxy-1  | INFO:     172.22.0.1:57762 - "POST /messages/?session_id=bcd16392e7674d629b9fc428d18cb506 HTTP/1.1" 202 Accepted
+mcp-proxy-1  | npm warn Unknown builtin config "globalignorefile". This will stop working in the next major version of npm.
+mcp-proxy-1  | npm warn Unknown builtin config "python". This will stop working in the next major version of npm.
+mcp-proxy-1  | INFO:     172.22.0.1:57752 - "POST /messages/?session_id=bcd16392e7674d629b9fc428d18cb506 HTTP/1.1" 202 Accepted
+mcp-proxy-1  | INFO:     172.22.0.1:57762 - "POST /messages/?session_id=bcd16392e7674d629b9fc428d18cb506 HTTP/1.1" 202 Accepted
+mcp-proxy-1  | Context7 Documentation MCP Server running on stdio
+mcp-proxy-1  | Downloading lxml (5.0MiB)
+mcp-proxy-1  | Downloading pydantic-core (2.1MiB)
+mcp-proxy-1  |  Downloading pydantic-core
+mcp-proxy-1  |  Downloading lxml
+mcp-proxy-1  | Installed 40 packages in 55ms
+mcp-proxy-1  | realpath: --: No such file or directory
+mcp-proxy-1  | Installed 29 packages in 34ms
+mcp-proxy-1  | realpath: --: No such file or directory
+mcp-proxy-1  | INFO:     172.22.0.1:47392 - "POST /messages/?session_id=bcd16392e7674d629b9fc428d18cb506 HTTP/1.1" 202 Accepted
+mcp-proxy-1  | INFO:     172.22.0.1:47392 - "POST /messages/?session_id=bcd16392e7674d629b9fc428d18cb506 HTTP/1.1" 202 Accepted
+mcp-proxy-1  | INFO:     172.22.0.1:47392 - "POST /messages/?session_id=bcd16392e7674d629b9fc428d18cb506 HTTP/1.1" 202 Accepted
+mcp-proxy-1  | INFO:     172.22.0.1:47392 - "POST /messages/?session_id=bcd16392e7674d629b9fc428d18cb506 HTTP/1.1" 202 Accepted
+mcp-proxy-1  | INFO:     172.22.0.1:47402 - "POST /messages/?session_id=bcd16392e7674d629b9fc428d18cb506 HTTP/1.1" 202 Accepted
+mcp-proxy-1  | INFO:     172.22.0.1:47392 - "POST /messages/?session_id=bcd16392e7674d629b9fc428d18cb506 HTTP/1.1" 202 Accepted
+
+```
