@@ -299,12 +299,13 @@ CMD ["python", "mcp_proxy.py", "sse", "--host", "0.0.0.0", "--port", "8000"]
 
 ### Current Status
 
-- **Working Solution**: Both `Dockerfile` and `Dockerfile.dev` now work correctly
+- **Working Solution**: Both `Dockerfile` and `Dockerfile.dev` now work correctly with configurable transport protocols
 - **Use Case Differentiation**: 
   - `Dockerfile`: Optimal for production (smaller images, simpler)
   - `Dockerfile.dev`: Optimal for development (faster builds, better caching)
 - **Performance Considerations**: `Dockerfile.dev` produces larger images (~20-30% due to bytecode compilation) but provides faster development iteration
 - **File Management**: `Dockerfile2` was removed as it was not relevant to this project's architecture
+- **Transport Flexibility**: Both Dockerfiles now support SSE, HTTP, and stdio transports via environment variables
 
 ### MCP Server Configuration
 
@@ -314,3 +315,183 @@ The project successfully proxies multiple MCP servers:
 - **time**: Uses `uvx` to run `mcp-server-time` with timezone configuration (Python-based)
 
 All servers are now working correctly with the resolved Node.js dependency issues.
+
+## 9. Transport Protocol Configuration Enhancement (Latest Session)
+
+### Issue: Fixed Transport Protocol Limitation
+
+**Date**: 2025-07-03 (Second Session)
+
+**Problem**: The Docker configuration was hardcoded to use SSE transport only. Users wanted flexibility to run either SSE or HTTP protocol by passing arguments without rebuilding images.
+
+**Requirements Analysis**:
+1. **Existing Capability**: `mcp_proxy.py` already supported multiple transports:
+   - `sse` transport (default port 8000)
+   - `http` transport (default port 8001)
+   - `stdio` transport
+2. **Limitation**: Dockerfiles hardcoded `CMD ["python", "mcp_proxy.py", "sse", "--host", "0.0.0.0", "--port", "8000"]`
+3. **Goal**: Make transport configurable via environment variables without image rebuilds
+
+### Implementation Approach: Environment Variables + Entrypoint Script
+
+**Solution Components**:
+
+#### 1. **Entrypoint Script** (`entrypoint.sh`)
+Created a flexible entrypoint script that:
+- Reads environment variables: `TRANSPORT`, `HOST`, `PORT`
+- Sets intelligent defaults (port 8000 for SSE, 8001 for HTTP)
+- Validates transport types (sse, http, stdio)
+- Constructs appropriate command arguments
+- Provides informative startup messages
+
+```bash
+#!/bin/sh
+# Default values
+TRANSPORT=${TRANSPORT:-sse}
+HOST=${HOST:-0.0.0.0}
+
+# Set default port based on transport if not specified
+if [ -z "$PORT" ]; then
+    case "$TRANSPORT" in
+        sse) PORT=8000 ;;
+        http) PORT=8001 ;;
+        stdio) PORT="" ;;
+        *) echo "Error: Unsupported transport '$TRANSPORT'"; exit 1 ;;
+    esac
+fi
+
+# Execute with constructed arguments
+exec python mcp_proxy.py $ARGS
+```
+
+#### 2. **Updated Dockerfiles**
+Both `Dockerfile` and `Dockerfile.dev` were modified to:
+- Copy and set executable permissions for `entrypoint.sh`
+- Expose both ports 8000 (SSE) and 8001 (HTTP)
+- Use `ENTRYPOINT ["/entrypoint.sh"]` instead of hardcoded `CMD`
+
+```dockerfile
+# Copy and set up entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Expose ports for both SSE (8000) and HTTP (8001) transports
+EXPOSE 8000 8001
+
+# Use entrypoint script to handle transport configuration
+ENTRYPOINT ["/entrypoint.sh"]
+```
+
+#### 3. **Enhanced docker-compose.yml**
+Added multiple service definitions for easy configuration:
+
+```yaml
+services:
+  # Default service - SSE transport (development mode)
+  mcp-proxy:
+    dockerfile: Dockerfile.dev
+    ports: ["8000:8000"]
+    environment:
+      - TRANSPORT=sse
+      - PORT=8000
+
+  # SSE transport (production mode)
+  mcp-proxy-sse:
+    dockerfile: Dockerfile
+    ports: ["8000:8000"]
+    environment:
+      - TRANSPORT=sse
+
+  # HTTP transport (development mode)
+  mcp-proxy-http-dev:
+    dockerfile: Dockerfile.dev
+    ports: ["8001:8001"]
+    environment:
+      - TRANSPORT=http
+
+  # HTTP transport (production mode)
+  mcp-proxy-http:
+    dockerfile: Dockerfile
+    ports: ["8001:8001"]
+    environment:
+      - TRANSPORT=http
+```
+
+#### 4. **Comprehensive Documentation Update**
+Updated `README.md` with three usage approaches:
+
+**Option 1: Predefined Services**
+```bash
+docker-compose up mcp-proxy              # SSE development
+docker-compose up mcp-proxy-http-dev     # HTTP development
+docker-compose up mcp-proxy-sse          # SSE production
+docker-compose up mcp-proxy-http         # HTTP production
+```
+
+**Option 2: Environment Variable Override**
+```bash
+TRANSPORT=http PORT=8001 docker-compose up mcp-proxy
+TRANSPORT=sse PORT=9000 docker-compose up mcp-proxy
+```
+
+**Option 3: Direct Docker Run**
+```bash
+docker run -p 8000:8000 -e TRANSPORT=sse mcp-proxy
+docker run -p 8001:8001 -e TRANSPORT=http mcp-proxy
+docker run -p 9000:9000 -e TRANSPORT=sse -e PORT=9000 mcp-proxy
+```
+
+### Testing and Validation
+
+**Comprehensive testing was performed**:
+1. **SSE Transport**: ✅ Confirmed working on port 8000
+2. **HTTP Transport**: ✅ Confirmed working on port 8001
+3. **Custom Port**: ✅ Confirmed working with PORT=9000
+4. **Environment Override**: ✅ Confirmed working with direct docker run
+5. **Service Definitions**: ✅ All 4 docker-compose services tested
+
+**Testing Results**:
+```bash
+# SSE Service
+Starting MCP proxy with transport: sse
+Server will be accessible at: http://0.0.0.0:8000
+INFO: Starting MCP server 'FastMCP' with transport 'sse' on http://0.0.0.0:8000/sse/
+
+# HTTP Service  
+Starting MCP proxy with transport: http
+Server will be accessible at: http://0.0.0.0:8001
+INFO: Starting MCP server 'FastMCP' with transport 'http' on http://0.0.0.0:8001/mcp/
+
+# Custom Port
+Starting MCP proxy with transport: http
+Server will be accessible at: http://0.0.0.0:9000
+INFO: Starting MCP server 'FastMCP' with transport 'http' on http://0.0.0.0:9000/mcp/
+```
+
+### Key Benefits Achieved
+
+1. **Single Image, Multiple Transports**: One Docker image now supports all transport protocols
+2. **No Rebuild Required**: Transport switching via environment variables only
+3. **Backward Compatibility**: Default behavior (SSE on 8000) preserved
+4. **Developer Experience**: Easy switching between development and production configurations
+5. **Flexible Deployment**: Supports various deployment scenarios (docker-compose, direct docker run, Kubernetes, etc.)
+6. **Clear Documentation**: Comprehensive examples for all usage patterns
+
+### Environment Variables Supported
+
+- **`TRANSPORT`**: Transport protocol (`sse`, `http`, `stdio`) - Default: `sse`
+- **`HOST`**: Host to bind to - Default: `0.0.0.0`
+- **`PORT`**: Port to listen on - Default: `8000` for SSE, `8001` for HTTP
+- **`TZ`**: Timezone - Default: `Etc/UTC`
+
+### Final Project Architecture
+
+The project now provides a complete, flexible MCP proxy solution with:
+- **Multiple MCP Server Support**: context7 (Node.js), fetch (Python), time (Python)
+- **Flexible Transport Options**: SSE, HTTP, stdio
+- **Dual Docker Configurations**: Development (optimized for speed) and production (optimized for size)
+- **Environment-Based Configuration**: No code changes needed for different deployments
+- **Comprehensive Documentation**: Clear usage examples and testing instructions
+- **Robust Error Handling**: Validation and informative error messages
+
+This enhancement successfully transforms the project from a fixed SSE-only configuration to a fully flexible, production-ready MCP proxy solution suitable for various deployment scenarios.
