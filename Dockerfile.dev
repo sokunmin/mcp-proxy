@@ -1,0 +1,27 @@
+# Use the official Astral uv image with Python 3.12 on Alpine
+FROM ghcr.io/astral-sh/uv:python3.12-alpine
+
+# Install nodejs and npm for the npx command (runtime dependency for context7)
+RUN apk add --no-cache nodejs npm
+
+# Set the working directory
+WORKDIR /app
+
+# Enable bytecode compilation for better performance
+ENV UV_COMPILE_BYTECODE=1
+
+# Copy only requirements first for better layer caching
+COPY requirements.txt servers.json ./
+
+# Install Python dependencies using cache mount
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application code (this layer changes frequently)
+COPY . .
+
+# Expose the port the app runs on
+EXPOSE 8000
+
+# Define the command to run the app
+CMD ["python", "mcp_proxy.py", "sse", "--host", "0.0.0.0", "--port", "8000"]

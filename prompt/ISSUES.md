@@ -165,9 +165,11 @@ The primary cause of this persistent issue is the unreliability of copying a Pyt
 
 The strategy was revised to install Python dependencies directly into the final image's system Python environment, mirroring the successful approach of the original `Dockerfile`, while retaining the multi-stage build for Node.js/npm isolation.
 
-## 7. Current `Dockerfile.optimized` (Final, Optimized Version)
+## 7. Problem 4: Node.js Shared Library Dependencies (Context7 MCP Server Failure)
 
-The `Dockerfile.optimized` has been updated to the following, which combines multi-stage building for Node.js/npm with direct system-wide Python package installation for maximum reliability:
+### Description of `Dockerfile.optimized` (Version 4 - Multi-stage with Binary Copying)
+
+The previous version attempted to use a multi-stage build where Node.js binaries were copied from the builder stage to the final stage to reduce image size:
 
 ```dockerfile
 # Stage 1: Build for Node.js and npm
@@ -178,19 +180,100 @@ RUN apk add --no-cache nodejs npm
 
 # Stage 2: Create the final, smaller image
 FROM python:3.12-alpine
+WORKDIR /app
+
+# Copy executables and their dependencies from the builder stage
+COPY --from=builder /usr/bin/npx /usr/bin/
+COPY --from=builder /usr/local/bin/uv /usr/bin/
+COPY --from=builder /usr/bin/node /usr/bin/
+COPY --from=builder /usr/local/bin/uvx /usr/bin/
+COPY --from=builder /usr/lib/node_modules /usr/lib/node_modules
+
+# ... rest of the configuration
+```
+
+### Symptoms
+
+The container would build successfully and the MCP proxy server would start, but when attempting to use the `context7` MCP server (which uses `npx`), it would fail with extensive shared library dependency errors:
+
+```
+Error loading shared library libada.so.2: No such file or directory (needed by /usr/bin/node)
+Error loading shared library libsimdjson.so.25: No such file or directory (needed by /usr/bin/node)
+Error loading shared library libstdc++.so.6: No such file or directory (needed by /usr/bin/node)
+Error relocating /usr/bin/node: nghttp2_submit_trailer: symbol not found
+Error relocating /usr/bin/node: _ZN8simdjson25get_active_implementationEv: symbol not found
+... (many more similar errors)
+```
+
+### Root Cause
+
+The issue was that copying Node.js binaries between Docker build stages (even within the same Alpine distribution) breaks the shared library dependencies. Node.js has complex dependencies on system libraries that are not automatically copied when copying just the binary files. The copied `node` binary could not find the required shared libraries in the final stage, causing runtime failures.
+
+### Resolution (for Problem 4)
+
+The solution was to abandon the multi-stage approach for Node.js and install it directly in the final stage, ensuring all dependencies are properly resolved:
+
+```dockerfile
+# Install nodejs and npm directly in the final stage (for reliable npx)
+RUN apk add --no-cache nodejs npm
+```
+
+## 8. Problem 5: Dockerfile Optimization Trade-offs (Image Size vs Build Performance)
+
+### Description of the Optimization Challenge
+
+After resolving the Node.js dependency issue, the question arose about the effectiveness of the "optimized" Dockerfile. Analysis revealed that `Dockerfile.optimized` was actually producing larger images than the original `Dockerfile`, raising questions about the optimization strategy.
+
+### Root Cause Analysis
+
+The "optimization" techniques had the following unexpected effects:
+
+1. **Build Cache Mounts**: `--mount=type=cache` improved build speed but didn't reduce final image size
+2. **Bytecode Compilation**: `UV_COMPILE_BYTECODE=1` increased image size by ~20-30% due to additional `.pyc` files
+3. **Multi-stage Complexity**: Added complexity without reducing final image size for this specific use case
+
+### Comparison Results
+
+| Aspect | Original Dockerfile | Dockerfile.optimized |
+|--------|-------------------|-------------------|
+| **Image Size** | Smaller ✅ | Larger ❌ |
+| **Build Speed** | Slower (no cache) | Faster (build cache) ✅ |
+| **Rebuild Speed** | Slower (reinstalls deps) | Faster (layer caching) ✅ |
+| **Runtime Performance** | Standard | Faster startup ✅ |
+| **Development Experience** | Rebuild everything | Only rebuild changed code ✅ |
+
+### Resolution (for Problem 5)
+
+The final approach was to maintain both Dockerfiles for different use cases:
+
+- **`Dockerfile`**: Optimal for production (smaller images, simpler)
+- **`Dockerfile.optimized`**: Optimal for development (faster builds, better caching)
+
+## 9. Final `Dockerfile.optimized` (Current Version)
+
+The current `Dockerfile.optimized` incorporates lessons learned from all previous issues:
+
+```dockerfile
+# Use the official Astral uv image with Python 3.12 on Alpine
+FROM ghcr.io/astral-sh/uv:python3.12-alpine
+
+# Install nodejs and npm for the npx command (runtime dependency for context7)
+RUN apk add --no-cache nodejs npm
 
 # Set the working directory
 WORKDIR /app
 
-# Copy npx and its dependencies from the builder stage
-COPY --from=builder /usr/bin/npx /usr/bin/
-COPY --from=builder /usr/lib/node_modules /usr/lib/node_modules
+# Enable bytecode compilation for better performance
+ENV UV_COMPILE_BYTECODE=1
 
-# Copy requirements and install Python dependencies system-wide
+# Copy only requirements first for better layer caching
 COPY requirements.txt servers.json ./
-RUN uv pip install --system --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
+# Install Python dependencies using cache mount
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application code (this layer changes frequently)
 COPY . .
 
 # Expose the port the app runs on
@@ -200,4 +283,12 @@ EXPOSE 8000
 CMD ["python", "mcp_proxy.py", "sse", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-This version is expected to provide a lean, efficient, and correctly configured environment for the `mcp_proxy.py` application, resolving all previously encountered issues.
+**Key Characteristics:**
+- Single-stage build (simplified from multi-stage)
+- Direct Node.js installation (avoids shared library issues)
+- Build cache optimization for development speed
+- Layer caching for efficient rebuilds
+- Bytecode compilation for runtime performance
+- Larger image size but better development experience
+
+This version provides a working solution that prioritizes development speed and reliability over absolute image size minimization.

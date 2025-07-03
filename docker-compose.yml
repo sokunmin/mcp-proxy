@@ -2,7 +2,7 @@ services:
   mcp-proxy:
     build:
       context: .
-      dockerfile: Dockerfile.optimized
+      dockerfile: Dockerfile.dev
     ports:
       - "8000:8000"
     volumes:

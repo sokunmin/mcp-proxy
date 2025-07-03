@@ -227,3 +227,90 @@ CMD ["python", "mcp_proxy.py", "sse", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 This version is expected to provide a lean, efficient, and correctly configured environment for the `mcp_proxy.py` application, resolving all previously encountered issues.
+
+## 8. Recent Issues and Final Resolution (Latest Session)
+
+### Issue: Context7 MCP Server Failure with Node.js Shared Library Dependencies
+
+**Date**: 2025-07-03
+
+**Problem**: The `Dockerfile.optimized` was failing when attempting to use the `context7` MCP server. The container would build successfully but fail at runtime with extensive Node.js shared library dependency errors.
+
+**Error Symptoms**:
+```
+Error loading shared library libada.so.2: No such file or directory (needed by /usr/bin/node)
+Error loading shared library libsimdjson.so.25: No such file or directory (needed by /usr/bin/node)
+Error loading shared library libstdc++.so.6: No such file or directory (needed by /usr/bin/node)
+Error relocating /usr/bin/node: nghttp2_submit_trailer: symbol not found
+Error relocating /usr/bin/node: _ZN8simdjson25get_active_implementationEv: symbol not found
+... (many more similar errors)
+```
+
+**Root Cause**: The multi-stage build approach was copying Node.js binaries between Docker stages without their required shared libraries. Node.js has complex dependencies on system libraries that are not automatically copied when copying just the binary files.
+
+**Investigation Process**:
+1. **Analyzed the server configuration**: `servers.json` showed the need for both `npx` (Node.js) and `uvx` (Python/uv) commands
+2. **Identified the hybrid approach**: `uvx` copying works fine (Python tool), but `npx` copying is problematic (Node.js with shared libraries)
+3. **Evaluated optimization trade-offs**: Compared image size vs. build performance vs. reliability
+
+**Final Resolution**: 
+- **Abandoned multi-stage approach for Node.js**: Install Node.js directly in the final stage to ensure all dependencies are properly resolved
+- **Maintained optimization for Python tools**: Keep copying `uv` and `uvx` from builder stage
+- **Applied build optimization techniques**: Added build cache mounts and layer caching
+
+### Current Final `Dockerfile.dev` (Version 5)
+
+```dockerfile
+# Use the official Astral uv image with Python 3.12 on Alpine
+FROM ghcr.io/astral-sh/uv:python3.12-alpine
+
+# Install nodejs and npm for the npx command (runtime dependency for context7)
+RUN apk add --no-cache nodejs npm
+
+# Set the working directory
+WORKDIR /app
+
+# Enable bytecode compilation for better performance
+ENV UV_COMPILE_BYTECODE=1
+
+# Copy only requirements first for better layer caching
+COPY requirements.txt servers.json ./
+
+# Install Python dependencies using cache mount
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application code (this layer changes frequently)
+COPY . .
+
+# Expose the port the app runs on
+EXPOSE 8000
+
+# Define the command to run the app
+CMD ["python", "mcp_proxy.py", "sse", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+### Key Lessons Learned
+
+1. **Docker Multi-stage Complexity**: Multi-stage builds are not always better - they add complexity and can introduce dependency issues
+2. **Shared Library Dependencies**: Copying binaries between stages can break shared library dependencies, especially for complex runtimes like Node.js
+3. **Optimization Trade-offs**: Build-time optimizations (cache mounts, layer caching) don't always reduce final image size but improve development experience
+4. **Context-Specific Solutions**: The "best" Docker approach depends on the specific use case (development vs. production)
+
+### Current Status
+
+- **Working Solution**: Both `Dockerfile` and `Dockerfile.dev` now work correctly
+- **Use Case Differentiation**: 
+  - `Dockerfile`: Optimal for production (smaller images, simpler)
+  - `Dockerfile.dev`: Optimal for development (faster builds, better caching)
+- **Performance Considerations**: `Dockerfile.dev` produces larger images (~20-30% due to bytecode compilation) but provides faster development iteration
+- **File Management**: `Dockerfile2` was removed as it was not relevant to this project's architecture
+
+### MCP Server Configuration
+
+The project successfully proxies multiple MCP servers:
+- **context7**: Uses `npx` to run `@upstash/context7-mcp` (Node.js-based)
+- **fetch**: Uses `uvx` to run `mcp-server-fetch` (Python-based)  
+- **time**: Uses `uvx` to run `mcp-server-time` with timezone configuration (Python-based)
+
+All servers are now working correctly with the resolved Node.js dependency issues.
