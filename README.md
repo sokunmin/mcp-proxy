@@ -67,19 +67,59 @@ For active development with faster rebuild times:
 
 ### Running Different Transports
 
-To run the server with a different transport (`http` or `stdio`), you can override the default command in the `docker-compose.yml` file or directly with `docker-compose run`.
+The Docker configuration now supports multiple transport protocols through environment variables and predefined services:
 
-*   **To run with HTTP transport:**
-    ```bash
-    # This starts the service on port 8001
-    docker-compose run --rm --service-ports mcp-proxy python mcp_proxy.py http --host 0.0.0.0 --port 8001
-    ```
+#### Option 1: Use Predefined Services
 
-*   **To run with Stdio transport:**
-    ```bash
-    # This starts the service and attaches your terminal to its stdio
-    docker-compose run --rm mcp-proxy python mcp_proxy.py stdio
-    ```
+**SSE Transport:**
+```bash
+# Development mode (default)
+docker-compose up mcp-proxy
+
+# Production mode
+docker-compose up mcp-proxy-sse
+```
+
+**HTTP Transport:**
+```bash
+# Development mode
+docker-compose up mcp-proxy-http-dev
+
+# Production mode  
+docker-compose up mcp-proxy-http
+```
+
+#### Option 2: Override Environment Variables
+
+You can override the transport type using environment variables:
+
+```bash
+# Run with HTTP transport on port 8001
+TRANSPORT=http PORT=8001 docker-compose up mcp-proxy
+
+# Run with SSE transport on custom port
+TRANSPORT=sse PORT=9000 docker-compose up mcp-proxy
+```
+
+#### Option 3: Direct Docker Run
+
+```bash
+# SSE transport
+docker run -p 8000:8000 -e TRANSPORT=sse mcp-proxy
+
+# HTTP transport
+docker run -p 8001:8001 -e TRANSPORT=http mcp-proxy
+
+# Custom port
+docker run -p 9000:9000 -e TRANSPORT=sse -e PORT=9000 mcp-proxy
+```
+
+#### Supported Environment Variables
+
+- **`TRANSPORT`**: Transport protocol (`sse`, `http`, `stdio`) - Default: `sse`
+- **`HOST`**: Host to bind to - Default: `0.0.0.0`
+- **`PORT`**: Port to listen on - Default: `8000` for SSE, `8001` for HTTP
+- **`TZ`**: Timezone - Default: `Etc/UTC`
 
 ---
 
@@ -134,15 +174,37 @@ To configure the proxy, edit the `servers.json` file. You can add, remove, or mo
 
 You can test the running proxy using any MCP-compliant client or a tool like `curl`.
 
+### Testing SSE Transport (Port 8000)
 ```bash
 # Test the SSE endpoint
 curl http://localhost:8000/sse/
 
 # Check server health
 curl http://localhost:8000/
+```
 
-# Test the HTTP endpoint (if running on port 8001)
+### Testing HTTP Transport (Port 8001)
+```bash
+# Test the HTTP endpoint
 curl http://localhost:8001/
+
+# Check server health
+curl http://localhost:8001/
+```
+
+### Testing with Different Services
+```bash
+# Test default service (SSE development)
+docker-compose up mcp-proxy
+curl http://localhost:8000/sse/
+
+# Test HTTP development service
+docker-compose up mcp-proxy-http-dev
+curl http://localhost:8001/
+
+# Test production SSE service
+docker-compose up mcp-proxy-sse
+curl http://localhost:8000/sse/
 ```
 
 ### Testing MCP Servers

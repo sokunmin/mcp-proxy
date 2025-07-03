@@ -15,8 +15,12 @@ RUN uv pip install --system --no-cache-dir -r requirements.txt
 # Copy the rest of the application code
 COPY . .
 
-# Expose the port the app runs on
-EXPOSE 8000
+# Copy and set up entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# Define the command to run the app
-CMD ["python", "mcp_proxy.py", "sse", "--host", "0.0.0.0", "--port", "8000"]
+# Expose ports for both SSE (8000) and HTTP (8001) transports
+EXPOSE 8000 8001
+
+# Use entrypoint script to handle transport configuration
+ENTRYPOINT ["/entrypoint.sh"]
