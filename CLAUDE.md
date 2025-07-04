@@ -1,50 +1,78 @@
-# Development Project
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-Developing MCP server using the latest FastMCP version, Python 3.12, and a uv venv virtual environment.
 
-## Environment Setup
+This is a FastMCP proxy server that exposes multiple MCP (Model Context Protocol) servers over various transport protocols. It's designed for production deployment using Docker containers.
 
-### Python Environment
-- Python Version: 3.12
-- uv venv path (VIRTUAL_ENV): 
-  - Windows: D:\rovo_workspace\global-mcp-venv
-  - MacOSX: /Users/chunming/mcp-venv
-- uv is only used for local environment.
+## Core Architecture
 
+- **mcp_proxy.py**: Main FastMCP proxy application that loads server configurations and handles transport protocols
+- **servers.json**: Configuration file defining which MCP servers to proxy (context7, fetch, time)
+- **entrypoint.sh**: Docker entrypoint script that configures transport and networking based on environment variables
+- **Dockerfile**: Production-ready Alpine Linux container with Python 3.12 and Node.js for mixed server support
 
-## Project Structure
+## Key Commands
+
+### Docker Development
+```bash
+# Build and run with Docker Compose (recommended)
+docker-compose up --build
+
+# Build container manually
+docker build -t mcp-proxy .
+
+# Run with specific transport
+TRANSPORT=http PORT=8001 docker-compose up
+
+# View logs
+docker-compose logs -f
 ```
-Project_Root/
-├── prompt/              # Documentations
-|    ├─ MEMORY.md         # All the context about this project.
-|    ├─ llms-mcp.txt      # Model Context Protocol documentation
-|    └─ llms-fastmcp.txt  # FastMCP documentation
-└── GEMINI.md         # This configuration file
+
+### Direct Python Execution
+```bash
+# Install dependencies
+uv pip install -r requirements.txt
+
+# Run with different transports
+python mcp_proxy.py sse --host 0.0.0.0 --port 8000
+python mcp_proxy.py http --host 0.0.0.0 --port 8001
+python mcp_proxy.py stdio
 ```
 
-## Documentation and Resource Acquisition
+## Configuration
 
-### Search Strategy
-Always search for the latest FastMCP documentation and coding standards:
-- Prioritize querying the official FastMCP documentation from `llms-fastmcp.txt`
-- Obtain the latest API references and best practices
-- Find code examples and patterns
-- Verify version compatibility and new features
-- Use `Context7 MCP server` to search more information if you cannot find any related information.
-- Prioritize query the official Cloudflare documentation for Cloudflare configuration/development using `cloudflare` MCP server.
+### Environment Variables
+- `TRANSPORT`: Protocol type (sse, http, stdio) - defaults to sse
+- `HOST`: Bind address - defaults to 0.0.0.0
+- `PORT`: Service port - defaults to 8000 for sse, 8001 for http
+- `TZ`: Timezone - defaults to Etc/UTC
 
+### MCP Server Configuration
+Edit `servers.json` to add/modify MCP servers:
+- **context7**: Node.js server via npx (document search)
+- **fetch**: Python server via uvx (web content fetching)  
+- **time**: Python server via uvx (time operations)
 
-## Notes
-- Use FastMCP 2.0
-- MCP server is suitable for local/docker/cloudflare deployment.
-- Requires Python 3.12+
-- All example code uses English comments.
-- When encountering problems, prioritize searching for the latest solutions via context7.
-- Do not over-engineer.
-- DO not create/modify any files and do not make any changes until user's confirmation.
+## Transport Protocols
 
-## AI Agent Interaction and Documentation Workflow
-- Any new or modified requirements must first be planned for developer reference. If the developer confirms it is executable, the `PLAN.md` file will be automatically updated.
-- Whenever the developer says "update memory", all current discussion content will be automatically updated to `.agent.md`. The updated content must provide detailed explanations, allowing other AI agents to fully understand the entire project's context from scratch.
+The proxy supports three transport modes:
+- **stdio**: Standard input/output for direct process communication
+- **sse**: Server-Sent Events for web-based streaming
+- **http**: Streamable HTTP for traditional web requests
 
+## Dependencies
+
+- **FastMCP 2.9.0+**: Core MCP proxy framework
+- **Node.js/npm**: Required for npx-based MCP servers
+- **Python 3.12**: Runtime environment
+- **uv**: Package management (containerized environment)
+
+## Container Architecture
+
+Uses `ghcr.io/astral-sh/uv:python3.12-alpine` base image with:
+- Pre-installed uv for fast Python package management
+- Node.js/npm for mixed server ecosystem support
+- Non-root execution for security
+- Multi-transport port exposure (8000, 8001)
