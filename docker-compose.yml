@@ -1,30 +1,15 @@
 services:
-  # Default service - SSE transport (production mode)
-  mcp-proxy-sse:
+  # MCP Proxy service - configurable transport via .env
+  mcp-proxy:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "${SSE_PORT}:${SSE_PORT}"
+      - "${PORT}:${PORT}"
     volumes:
       - ./servers.json:/app/servers.json:ro
     environment:
       - TZ=${TZ}
-      - TRANSPORT=sse
+      - TRANSPORT=${TRANSPORT}
       - HOST=${HOST}
-      - PORT=${SSE_PORT}
-
-  # HTTP transport (production mode)
-  mcp-proxy-http:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "${HTTP_PORT}:${HTTP_PORT}"
-    volumes:
-      - ./servers.json:/app/servers.json:ro
-    environment:
-      - TZ=${TZ}
-      - TRANSPORT=http
-      - HOST=${HOST}
-      - PORT=${HTTP_PORT}
+      - PORT=${PORT}

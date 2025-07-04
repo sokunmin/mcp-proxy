@@ -21,7 +21,9 @@ The server is containerized using Docker for easy and consistent deployment, opt
 
 ## How to Run
 
-This project is designed for production deployment using Docker:
+This project is designed for production deployment using Docker. You can run it using either Docker Compose or direct Docker commands:
+
+### Prerequisites
 
 1.  **Clone the repository:**
     ```bash
@@ -29,61 +31,152 @@ This project is designed for production deployment using Docker:
     cd mcp-proxy
     ```
 
-2.  **Build and Run the Server:**
-    ```bash
-    docker-compose up --build
-    ```
-    The `--build` flag ensures any changes to the `Dockerfile` or source code are applied.
+### Method 1: Using Docker Compose (Recommended)
 
-    The server will be accessible at `http://localhost:8000`.
-
-### Running Different Transports
-
-The Docker configuration supports multiple transport protocols through environment variables and predefined services:
-
-#### Option 1: Use Predefined Services
-
-**SSE Transport (Default):**
-```bash
-docker-compose up mcp-proxy-sse
-```
-
-**HTTP Transport:**
-```bash
-docker-compose up mcp-proxy-http
-```
-
-#### Option 2: Override Environment Variables
-
-You can override the transport type using environment variables:
+The easiest way to run the proxy with predefined configuration:
 
 ```bash
-# Run with HTTP transport on port 8001
-TRANSPORT=http PORT=8001 docker-compose up mcp-proxy-sse
+# Run with default settings (SSE transport, port 8000)
+docker-compose up --build
 
-# Run with SSE transport on custom port
-TRANSPORT=sse PORT=9000 docker-compose up mcp-proxy-sse
+# Run in background
+docker-compose up -d --build
+
+# Stop the service
+docker-compose down
 ```
 
-#### Option 3: Direct Docker Run
+#### Override Environment Variables
+
+You can override the default transport without editing files:
 
 ```bash
-# SSE transport
-docker run -p 8000:8000 -e TRANSPORT=sse mcp-proxy
+# Run with HTTP transport
+TRANSPORT=http PORT=8001 docker-compose up
 
-# HTTP transport
-docker run -p 8001:8001 -e TRANSPORT=http mcp-proxy
+# Run with custom port
+PORT=9000 docker-compose up
 
-# Custom port
-docker run -p 9000:9000 -e TRANSPORT=sse -e PORT=9000 mcp-proxy
+# Run with multiple overrides
+TRANSPORT=http PORT=8080 docker-compose up
 ```
 
-#### Supported Environment Variables
+### Method 2: Using Docker Run
+
+For more control over the container configuration:
+
+#### Step 1: Build the Image
+```bash
+docker build -t mcp-proxy .
+```
+
+#### Step 2: Run the Container
+
+**Option A: Using environment variables directly**
+
+```bash
+# SSE Transport (Default)
+docker run -d --name mcp-proxy \
+  -p 8000:8000 \
+  -e TRANSPORT=sse \
+  -e HOST=0.0.0.0 \
+  -e PORT=8000 \
+  -e TZ=Etc/UTC \
+  mcp-proxy
+
+# HTTP Transport
+docker run -d --name mcp-proxy-http \
+  -p 8001:8001 \
+  -e TRANSPORT=http \
+  -e HOST=0.0.0.0 \
+  -e PORT=8001 \
+  -e TZ=Etc/UTC \
+  mcp-proxy
+```
+
+**Option B: Using .env file with consistent PORT variable**
+
+```bash
+# Load environment variables from .env file
+source .env
+
+# Run with loaded variables
+docker run -d --name mcp-proxy \
+  -p ${PORT}:${PORT} \
+  -e TRANSPORT=${TRANSPORT} \
+  -e HOST=${HOST} \
+  -e PORT=${PORT} \
+  -e TZ=${TZ} \
+  mcp-proxy
+
+# For HTTP transport, override specific variables
+TRANSPORT=http PORT=8001 docker run -d --name mcp-proxy-http \
+  -p ${PORT}:${PORT} \
+  -e TRANSPORT=${TRANSPORT} \
+  -e HOST=${HOST} \
+  -e PORT=${PORT} \
+  -e TZ=${TZ} \
+  mcp-proxy
+```
+
+**Option C: Using --env-file**
+
+```bash
+# Use .env file directly
+docker run -d --name mcp-proxy \
+  --env-file .env \
+  -p 8000:8000 \
+  mcp-proxy
+
+# Override specific variables
+docker run -d --name mcp-proxy-http \
+  --env-file .env \
+  -e TRANSPORT=http \
+  -e PORT=8001 \
+  -p 8001:8001 \
+  mcp-proxy
+```
+
+#### Container Management
+
+```bash
+# View logs
+docker logs mcp-proxy
+
+# Stop the container
+docker stop mcp-proxy
+
+# Remove the container
+docker rm mcp-proxy
+
+# View running containers
+docker ps
+```
+
+### Environment Variables
+
+The following environment variables can be configured in the `.env` file or passed directly:
 
 - **`TRANSPORT`**: Transport protocol (`sse`, `http`, `stdio`) - Default: `sse`
 - **`HOST`**: Host to bind to - Default: `0.0.0.0`
-- **`PORT`**: Port to listen on - Default: `8000` for SSE, `8001` for HTTP
+- **`PORT`**: Port number for the service - Default: `8000`
 - **`TZ`**: Timezone - Default: `Etc/UTC`
+
+### Quick Start Examples
+
+```bash
+# Default SSE on port 8000
+docker-compose up
+
+# HTTP on port 8001
+TRANSPORT=http PORT=8001 docker-compose up
+
+# Custom port
+PORT=9000 docker-compose up
+
+# Run in background
+docker-compose up -d
+```
 
 ---
 
