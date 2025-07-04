@@ -1,30 +1,12 @@
 
 import asyncio
 import argparse
+import json
 from fastmcp import FastMCP, Client
 
-# Define the MCP server(s) we want to proxy, based on claude_desktop_config.json
-# This configuration is directly consumable by FastMCP.as_proxy()
-proxy_config = {
-    "mcpServers": {
-        "context7": {
-            "transport": "stdio",
-            "command": "npx",
-            "args": ["-y", "@upstash/context7-mcp"]
-        },
-        "fetch": {
-            "command": "uvx",
-            "args": ["mcp-server-fetch"]
-        },
-        "time": {
-            "transport": "stdio",
-            "command": "uvx",
-            "args": ["mcp-server-time"]
-        }
-    }
-}
-
-base_app = FastMCP()
+# Load server configuration from a JSON file
+with open('servers.json', 'r') as f:
+    proxy_config = json.load(f)
 
 # Create a FastMCP application instance that acts as a proxy
 # FastMCP.as_proxy() handles the internal creation and mounting of clients

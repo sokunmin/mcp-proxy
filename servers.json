@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "context7": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+      "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch"]
+    },
+    "time": {
+      "transport": "stdio",
+      "command": "uvx",
+      "args": ["mcp-server-time", "--local-timezone", "Etc/UTC"]
+    }
+  }
+}
