@@ -2,96 +2,110 @@
 
 This project provides a simple and flexible proxy server built with **FastMCP**. It is designed to expose one or more underlying MCP (Model Context Protocol) servers over various transport protocols, making them accessible to a wider range of clients.
 
-The server is containerized using Docker for easy and consistent deployment, with optimized configurations for both production and development environments.
+The server is containerized using Docker for easy and consistent deployment, with flexible environment-based configuration supporting both production and development workflows.
 
 ## Features
 
 - **Multiple Transports**: Expose MCP servers over `stdio`, `sse` (Server-Sent Events), or `http`.
 - **Flexible Configuration**: Easily configure which MCP servers to proxy by editing the `servers.json` file.
+- **Environment-Based Setup**: Use `.env` file for easy configuration management across different environments.
 - **Lightweight & Fast**: Built on the efficient FastMCP library and runs in a small Alpine Linux container.
 - **Dual Docker Configurations**: Optimized Dockerfiles for both production and development workflows.
 - **MCP Server Support**: Supports both Node.js (`npx`) and Python (`uvx`) based MCP servers.
+- **Cross-Platform Development**: Includes `.gitattributes` for consistent line endings across different operating systems.
 
 ## Requirements
 
 - Docker and Docker Compose
+- `.env` file for environment configuration (provided)
 
 ---
 
 ## How to Run
 
-This project provides two Docker configurations:
+This project uses environment variables for flexible configuration. All settings are controlled via the `.env` file, which you can modify or override as needed.
 
-- **`Dockerfile`** - Production-optimized (smaller images, simpler)
-- **`Dockerfile.dev`** - Development-optimized (faster builds, better caching)
-
-### Production Mode (Recommended)
-
-For production deployment or when you want the smallest possible image:
+### Quick Start
 
 1.  **Clone the repository:**
     ```bash
-    git clone <repository-url>
+    git clone https://github.com/sokunmin/mcp-proxy.git
     cd mcp-proxy
     ```
 
-2.  **Build and Run the Server:**
+2.  **Review the `.env` file:**
+    ```bash
+    cat .env
+    ```
+    Default values:
+    ```
+    TZ=Etc/UTC
+    HOST=0.0.0.0
+    TRANSPORT=sse
+    PORT=8000
+    ```
+
+3.  **Run with default settings (development mode):**
     ```bash
     docker-compose up --build
     ```
-    The `--build` flag ensures any changes to the `Dockerfile` or source code are applied.
-
     The server will be accessible at `http://localhost:8000`.
 
-### Development Mode
+### Running Different Modes
 
-For active development with faster rebuild times:
-
-1.  **Use the development Dockerfile:**
-    ```bash
-    docker-compose -f docker-compose.yml up --build
-    ```
-    Or modify `docker-compose.yml` to use `Dockerfile.dev`:
-    ```yaml
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    ```
-
-2.  **Benefits of development mode:**
-    - Faster rebuilds (only application code layer rebuilds when you change code)
-    - Build cache optimization for dependencies
-    - Better development iteration speed
-
-**Note**: The project files are mounted as a volume, so you can edit the `servers.json` file on your local machine, and changes will be reflected when you restart the container.
-
-### Running Different Transports
-
-The Docker configuration now supports multiple transport protocols through environment variables and predefined services:
-
-#### Option 1: Use Predefined Services
-
-**SSE Transport:**
+#### Development Mode (Default)
 ```bash
-# Development mode (default)
+# Uses Dockerfile.dev for faster builds
+docker-compose up mcp-proxy
+```
+
+#### Production Mode
+```bash
+# Uses Dockerfile for smaller images
+docker-compose up mcp-proxy-prod
+```
+
+### Transport Protocols
+
+The proxy supports both **SSE (Server-Sent Events)** and **HTTP** transports. You can switch between them by modifying the `TRANSPORT` variable.
+
+#### Using SSE Transport (Default)
+```bash
+# .env file already has TRANSPORT=sse
+docker-compose up mcp-proxy
+```
+
+#### Using HTTP Transport
+```bash
+# Method 1: Edit .env file
+# Change TRANSPORT=http in .env file
 docker-compose up mcp-proxy
 
-# Production mode
-docker-compose up mcp-proxy-sse
+# Method 2: Override environment variable
+TRANSPORT=http PORT=8001 docker-compose up mcp-proxy
 ```
 
-**HTTP Transport:**
+### Environment Configuration
+
+#### Using the .env File
+
+Modify the `.env` file to change default behavior:
+
 ```bash
-# Development mode
-docker-compose up mcp-proxy-http-dev
+# Edit .env file
+vim .env
 
-# Production mode  
-docker-compose up mcp-proxy-http
+# Example: Change to HTTP transport on port 8001
+TRANSPORT=http
+PORT=8001
+
+# Run with new settings
+docker-compose up mcp-proxy
 ```
 
-#### Option 2: Override Environment Variables
+#### Override Environment Variables
 
-You can override the transport type using environment variables:
+You can override `.env` values using environment variables:
 
 ```bash
 # Run with HTTP transport on port 8001
@@ -99,27 +113,33 @@ TRANSPORT=http PORT=8001 docker-compose up mcp-proxy
 
 # Run with SSE transport on custom port
 TRANSPORT=sse PORT=9000 docker-compose up mcp-proxy
-```
 
-#### Option 3: Direct Docker Run
-
-```bash
-# SSE transport
-docker run -p 8000:8000 -e TRANSPORT=sse mcp-proxy
-
-# HTTP transport
-docker run -p 8001:8001 -e TRANSPORT=http mcp-proxy
-
-# Custom port
-docker run -p 9000:9000 -e TRANSPORT=sse -e PORT=9000 mcp-proxy
+# Run production mode with custom settings
+TRANSPORT=http PORT=8080 docker-compose up mcp-proxy-prod
 ```
 
 #### Supported Environment Variables
 
 - **`TRANSPORT`**: Transport protocol (`sse`, `http`, `stdio`) - Default: `sse`
 - **`HOST`**: Host to bind to - Default: `0.0.0.0`
-- **`PORT`**: Port to listen on - Default: `8000` for SSE, `8001` for HTTP
+- **`PORT`**: Port to listen on - Default: `8000`
 - **`TZ`**: Timezone - Default: `Etc/UTC`
+
+#### Examples
+
+```bash
+# Development mode with default settings (SSE on port 8000)
+docker-compose up mcp-proxy
+
+# Production mode with HTTP transport
+TRANSPORT=http PORT=8001 docker-compose up mcp-proxy-prod
+
+# Development mode with custom port
+PORT=9000 docker-compose up mcp-proxy
+
+# HTTP transport on port 8001
+TRANSPORT=http PORT=8001 docker-compose up mcp-proxy
+```
 
 ---
 
@@ -157,6 +177,7 @@ To configure the proxy, edit the `servers.json` file. You can add, remove, or mo
 - **Size**: Smaller, optimized for deployment
 - **Build Time**: Standard (no build cache)
 - **Use Case**: Production deployments, CI/CD pipelines
+- **Service**: `mcp-proxy-prod`
 
 ### Development Dockerfile (`Dockerfile.dev`)
 - **Base Image**: `ghcr.io/astral-sh/uv:python3.12-alpine`
@@ -167,6 +188,12 @@ To configure the proxy, edit the `servers.json` file. You can add, remove, or mo
   - Layer caching for efficient rebuilds
   - Bytecode compilation for better runtime performance
 - **Use Case**: Active development, frequent code changes
+- **Service**: `mcp-proxy` (default)
+
+### Environment Configuration
+- **`.env` file**: Contains default environment variables
+- **Variable override**: Environment variables can be overridden at runtime
+- **Cross-platform**: `.gitattributes` ensures consistent line endings across Windows/Unix systems
 
 ---
 
@@ -198,13 +225,17 @@ curl http://localhost:8001/
 docker-compose up mcp-proxy
 curl http://localhost:8000/sse/
 
-# Test HTTP development service
-docker-compose up mcp-proxy-http-dev
+# Test HTTP transport
+TRANSPORT=http PORT=8001 docker-compose up mcp-proxy
 curl http://localhost:8001/
 
-# Test production SSE service
-docker-compose up mcp-proxy-sse
+# Test production mode
+docker-compose up mcp-proxy-prod
 curl http://localhost:8000/sse/
+
+# Test production mode with HTTP transport
+TRANSPORT=http PORT=8001 docker-compose up mcp-proxy-prod
+curl http://localhost:8001/
 ```
 
 ### Testing MCP Servers
@@ -231,7 +262,10 @@ All servers are automatically started by the proxy when needed.
 
 - Use `Dockerfile.dev` for faster iteration during development
 - Use `Dockerfile` for smaller production images
+- Modify `.env` file for persistent configuration changes
+- Use environment variable overrides for temporary changes
 - The `servers.json` file is mounted as a volume, so changes take effect on container restart
+- Cross-platform development is supported with `.gitattributes` for consistent line endings
 
 ---
 

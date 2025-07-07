@@ -1,60 +1,30 @@
 services:
-  # Default service - SSE transport (development mode)
+  # Default service - Development mode (configurable via .env)
   mcp-proxy:
     build:
       context: .
       dockerfile: Dockerfile.dev
     ports:
-      - "8000:8000"
+      - "${PORT}:${PORT}"
     volumes:
       - .:/app
     environment:
-      - TZ=Etc/UTC
-      - TRANSPORT=sse
-      - HOST=0.0.0.0
-      - PORT=8000
+      - TZ=${TZ}
+      - TRANSPORT=${TRANSPORT}
+      - HOST=${HOST}
+      - PORT=${PORT}
 
-  # SSE transport (production mode)
-  mcp-proxy-sse:
+  # Production mode (configurable via .env)
+  mcp-proxy-prod:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "${PORT}:${PORT}"
     volumes:
       - .:/app
     environment:
-      - TZ=Etc/UTC
-      - TRANSPORT=sse
-      - HOST=0.0.0.0
-      - PORT=8000
-
-  # HTTP transport (development mode)
-  mcp-proxy-http-dev:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    ports:
-      - "8001:8001"
-    volumes:
-      - .:/app
-    environment:
-      - TZ=Etc/UTC
-      - TRANSPORT=http
-      - HOST=0.0.0.0
-      - PORT=8001
-
-  # HTTP transport (production mode)
-  mcp-proxy-http:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8001:8001"
-    volumes:
-      - .:/app
-    environment:
-      - TZ=Etc/UTC
-      - TRANSPORT=http
-      - HOST=0.0.0.0
-      - PORT=8001
+      - TZ=${TZ}
+      - TRANSPORT=${TRANSPORT}
+      - HOST=${HOST}
+      - PORT=${PORT}
