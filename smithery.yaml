@@ -1,0 +1,35 @@
+runtime: "container"
+build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
+startCommand:
+  type: "sse"
+  port: 8000
+env:
+  TRANSPORT: "sse"
+  HOST: "0.0.0.0"
+  PORT: 8000
+  TZ: "Etc/UTC"
+configSchema:
+  type: "object"
+  properties:
+    transport:
+      type: "string"
+      enum: ["stdio", "sse", "http"]
+      default: "sse"
+      description: "Transport protocol to use for MCP communication"
+    port:
+      type: "integer"
+      default: 8000
+      minimum: 1024
+      maximum: 65535
+      description: "Port number for HTTP transport"
+    host:
+      type: "string"
+      default: "0.0.0.0"
+      description: "Host address to bind the server"
+    timezone:
+      type: "string"
+      default: "Etc/UTC"
+      description: "Timezone for time-related operations"
+  additionalProperties: false

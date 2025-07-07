@@ -1,0 +1,40 @@
+{
+  "name": "mcp-proxy-smithery",
+  "version": "1.0.0",
+  "description": "FastMCP proxy server that exposes multiple MCP servers over various transport protocols",
+  "main": "mcp_proxy.py",
+  "scripts": {
+    "start": "python mcp_proxy.py sse --host 0.0.0.0 --port 8000",
+    "build": "echo 'Build step - Docker image will be built by Smithery'",
+    "dev": "python mcp_proxy.py sse --host 0.0.0.0 --port 8000",
+    "http": "python mcp_proxy.py http --host 0.0.0.0 --port 8001",
+    "test": "echo 'No tests specified'"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "fastmcp",
+    "proxy",
+    "smithery"
+  ],
+  "author": "FastMCP Proxy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/smithery-ai/mcp-proxy-smithery.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "smithery": {
+    "runtime": "container",
+    "transport": "sse",
+    "servers": [
+      "context7",
+      "fetch", 
+      "time"
+    ]
+  }
+}
