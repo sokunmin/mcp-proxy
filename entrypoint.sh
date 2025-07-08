@@ -1,6 +1,11 @@
 #!/bin/sh
 set -e
 
+# Enable debug mode if DEBUG is set
+if [ "$DEBUG" = "true" ]; then
+    set -x
+fi
+
 # Default values
 TRANSPORT=${TRANSPORT:-sse}
 HOST=${HOST:-0.0.0.0}
@@ -24,6 +29,21 @@ if [ -z "$PORT" ]; then
     esac
 fi
 
+# Verify runtime package managers are available (for lazy loading)
+echo "Verifying runtime package managers..."
+command -v python >/dev/null 2>&1 || { echo "Python not found"; exit 1; }
+command -v npx >/dev/null 2>&1 || { echo "npx not found"; exit 1; }
+command -v uvx >/dev/null 2>&1 || { echo "uvx not found"; exit 1; }
+
+# Test servers.json exists and is valid JSON
+if [ ! -f "servers.json" ]; then
+    echo "Error: servers.json not found"
+    exit 1
+fi
+
+# Validate JSON syntax
+python -m json.tool servers.json > /dev/null 2>&1 || { echo "Error: Invalid JSON in servers.json"; exit 1; }
+
 # Build command arguments
 ARGS="$TRANSPORT"
 
@@ -33,6 +53,7 @@ if [ "$TRANSPORT" != "stdio" ]; then
 fi
 
 echo "Starting MCP proxy with transport: $TRANSPORT"
+echo "Lazy loading enabled for: npx, uvx"
 if [ "$TRANSPORT" != "stdio" ]; then
     echo "Server will be accessible at: http://$HOST:$PORT"
 fi

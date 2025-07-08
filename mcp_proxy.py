@@ -2,16 +2,34 @@
 import asyncio
 import argparse
 import json
+import logging
 from fastmcp import FastMCP, Client
 
-# Load server configuration from a JSON file
-with open('servers.json', 'r') as f:
-    proxy_config = json.load(f)
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Create a FastMCP application instance that acts as a proxy
-# FastMCP.as_proxy() handles the internal creation and mounting of clients
-proxy_client = Client(proxy_config)
-app = FastMCP.as_proxy(backend=proxy_client)
+try:
+    # Load server configuration from a JSON file
+    with open('servers.json', 'r') as f:
+        proxy_config = json.load(f)
+    
+    logger.info(f"Loaded configuration for {len(proxy_config['mcpServers'])} servers")
+    
+    # Create a FastMCP application instance that acts as a proxy
+    # This preserves lazy loading - servers are started when first accessed
+    proxy_client = Client(proxy_config)
+    app = FastMCP.as_proxy(backend=proxy_client)
+    
+    # Add minimal health check endpoint for Smithery
+    @app.get("/health")
+    async def health_check():
+        """Basic health check endpoint"""
+        return {"status": "healthy", "servers": list(proxy_config["mcpServers"].keys())}
+        
+except Exception as e:
+    logger.error(f"Failed to initialize MCP proxy: {e}")
+    raise
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the FastMCP proxy server.")
@@ -32,14 +50,17 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    print(f"Starting proxy with {args.transport} transport...")
+    logger.info(f"Starting proxy with {args.transport} transport (lazy loading enabled)...")
 
-    if args.transport == "stdio":
-        # Run the server over standard input/output
-        app.run(transport="stdio")
-    elif args.transport == "sse":
-        # Run the server with Server-Sent Events
-        app.run(transport="sse", port=args.port, host=args.host)
-    elif args.transport == "http":
-        # Run the server with streamable HTTP
-        app.run(transport="http", port=args.port, host=args.host)
+    try:
+        if args.transport == "stdio":
+            app.run(transport="stdio")
+        elif args.transport == "sse":
+            logger.info(f"Starting SSE server on {args.host}:{args.port}")
+            app.run(transport="sse", port=args.port, host=args.host)
+        elif args.transport == "http":
+            logger.info(f"Starting HTTP server on {args.host}:{args.port}")
+            app.run(transport="http", port=args.port, host=args.host)
+    except Exception as e:
+        logger.error(f"Failed to start server: {e}")
+        raise

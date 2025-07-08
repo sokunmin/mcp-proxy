@@ -2,8 +2,9 @@
 FROM ghcr.io/astral-sh/uv:python3.12-alpine
 
 # Install nodejs and npm for the npx command (runtime dependency for context7)
+# Add curl for potential health checks
 # Alpine's package manager is apk
-RUN apk add --no-cache nodejs npm
+RUN apk add --no-cache nodejs npm curl
 
 # Set the working directory
 WORKDIR /app
