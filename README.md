@@ -1,16 +1,18 @@
-
 # FastMCP Proxy Server
 
-This project provides a simple and flexible proxy server built with **FastMCP**. It is designed to expose one or more underlying MCP (Model Context Protocol) servers over various transport protocols, making them accessible to a wider range of clients.
+A lightweight proxy server built with **FastMCP** that exposes one or more underlying MCP (Model Context Protocol) servers over various transport protocols, making them accessible to a wider range of clients.
 
-The server is containerized using Docker for easy and consistent deployment, optimized for production environments.
+## Project Status
+
+⚠️ **This project is no longer maintained.**
+
+It was built in mid-2025 as a lightweight FastMCP-based proxy to reduce MCP server configuration duplication across multiple local AI clients (e.g. Claude Desktop, VS Code, Cursor). The MCP ecosystem has since evolved quickly, and this repo is kept here as a reference/prototype only.
 
 ## Features
 
 - **Multiple Transports**: Expose MCP servers over `stdio`, `sse` (Server-Sent Events), or `http`.
 - **Flexible Configuration**: Easily configure which MCP servers to proxy by editing the `servers.json` file.
-- **Lightweight & Fast**: Built on the efficient FastMCP library and runs in a small Alpine Linux container.
-- **Production Ready**: Optimized Docker configuration for production deployment.
+- **Lightweight**: Built on the efficient FastMCP library and runs in a small Alpine Linux container.
 - **MCP Server Support**: Supports both Node.js (`npx`) and Python (`uvx`) based MCP servers.
 
 ## Requirements
@@ -21,7 +23,7 @@ The server is containerized using Docker for easy and consistent deployment, opt
 
 ## How to Run
 
-This project is designed for production deployment using Docker. You can run it using either Docker Compose or direct Docker commands:
+This project can be run using Docker Compose or direct Docker commands:
 
 ### Prerequisites
 
@@ -254,32 +256,6 @@ All servers are automatically started by the proxy when needed.
 
 ---
 
-## Production Deployment
-
-### Docker Configuration Details
-
-- **Base Image**: `ghcr.io/astral-sh/uv:python3.12-alpine`
-- **Optimized**: Small size, production-ready
-- **Security**: Runs as non-root user
-- **Environment**: Configurable via environment variables
-
-### Best Practices
-
-1. **Use environment variables** for configuration instead of modifying files
-2. **Mount `servers.json` as a volume** for easy configuration updates
-3. **Use Docker Compose** for consistent deployment
-4. **Monitor logs** using `docker-compose logs -f`
-5. **Use health checks** to ensure service availability
-
-### Scaling
-
-For high-availability deployment, consider:
-- Using multiple replicas behind a load balancer
-- Implementing proper logging and monitoring
-- Using container orchestration (Kubernetes, Docker Swarm)
-
----
-
 ## Troubleshooting
 
 ### Common Issues
@@ -301,11 +277,3 @@ docker-compose ps
 # Access container shell (if needed)
 docker-compose exec mcp-proxy-sse sh
 ```
-
----
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a pull request or open an issue to discuss any changes.
-
-For development setup, please use the `dev` branch which includes development-optimized configurations.
